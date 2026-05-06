@@ -1,7 +1,10 @@
+import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaNeon } from "@prisma/adapter-neon";
 
-const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: "file:./dev.db" }) });
+const url = process.env.DATABASE_URL;
+if (!url) throw new Error("DATABASE_URL não configurada em .env.local");
+const prisma = new PrismaClient({ adapter: new PrismaNeon({ connectionString: url }) });
 
 const LESSONS: Record<string, { title: string; topic: string; type: string; duration: number; content: string }[]> = {
   Português: [
