@@ -1,0 +1,182 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  studyPlans       StudyPlan[]
+  flashcards       Flashcard[]
+  studySessions    StudySession[]
+  dailyGoals       DailyGoal[]
+  materialProgress MaterialProgress[]
+  answers          UserAnswer[]
+  lessonProgress   LessonProgress[]
+}
+
+model StudyPlan {
+  id        String    @id @default(cuid())
+  userId    String
+  examName  String
+  examDate  DateTime?
+  createdAt DateTime  @default(now())
+
+  user     User      @relation(fields: [userId], references: [id])
+  subjects Subject[]
+}
+
+model Subject {
+  id          String @id @default(cuid())
+  studyPlanId String
+  name        String
+  weeklyHours Float  @default(2)
+  priority    Int    @default(1)
+
+  studyPlan     StudyPlan      @relation(fields: [studyPlanId], references: [id])
+  flashcards    Flashcard[]
+  studySessions StudySession[]
+  materials     Material[]
+  questions     Question[]
+  lessons       Lesson[]
+}
+
+model Flashcard {
+  id          String   @id @default(cuid())
+  userId      String
+  subjectId   String
+  question    String
+  answer      String
+  easeFactor  Float    @default(2.5)
+  interval    Int      @default(1)
+  repetitions Int      @default(0)
+  nextReview  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+}
+
+model StudySession {
+  id        String   @id @default(cuid())
+  userId    String
+  subjectId String
+  minutes   Int
+  date      DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+}
+
+model DailyGoal {
+  id            String   @id @default(cuid())
+  userId        String
+  date          DateTime
+  targetMinutes Int      @default(120)
+  doneMinutes   Int      @default(0)
+  completed     Boolean  @default(false)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+}
+
+model Material {
+  id        String   @id @default(cuid())
+  subjectId String
+  title     String
+  content   String
+  type      String   @default("article")
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  subject  Subject            @relation(fields: [subjectId], references: [id])
+  progress MaterialProgress[]
+}
+
+model MaterialProgress {
+  id          String    @id @default(cuid())
+  userId      String
+  materialId  String
+  completedAt DateTime?
+
+  user     User     @relation(fields: [userId], references: [id])
+  material Material @relation(fields: [materialId], references: [id])
+
+  @@unique([userId, materialId])
+}
+
+model Lesson {
+  id          String  @id @default(cuid())
+  subjectId   String
+  title       String
+  topic       String
+  content     String
+  videoUrl    String?
+  duration    Int     @default(10)
+  order       Int     @default(0)
+  type        String  @default("video")
+  createdAt   DateTime @default(now())
+
+  subject  Subject          @relation(fields: [subjectId], references: [id])
+  progress LessonProgress[]
+}
+
+model LessonProgress {
+  id             String    @id @default(cuid())
+  userId         String
+  lessonId       String
+  completedAt    DateTime?
+  watchedSeconds Int       @default(0)
+
+  user   User   @relation(fields: [userId], references: [id])
+  lesson Lesson @relation(fields: [lessonId], references: [id])
+
+  @@unique([userId, lessonId])
+}
+
+model Question {
+  id          String  @id @default(cuid())
+  subjectId   String
+  topic       String  @default("Geral")
+  content     String
+  explanation String
+  banca       String  @default("CESPE")
+  difficulty  String  @default("medium")
+  year        Int?
+
+  subject Subject          @relation(fields: [subjectId], references: [id])
+  options QuestionOption[]
+  answers UserAnswer[]
+}
+
+model QuestionOption {
+  id         String  @id @default(cuid())
+  questionId String
+  letter     String
+  text       String
+  isCorrect  Boolean @default(false)
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+model UserAnswer {
+  id         String   @id @default(cuid())
+  userId     String
+  questionId String
+  optionId   String?
+  isCorrect  Boolean
+  timeSpent  Int      @default(0)
+  mode       String   @default("treino")
+  answeredAt DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id])
+  question Question @relation(fields: [questionId], references: [id])
+}
