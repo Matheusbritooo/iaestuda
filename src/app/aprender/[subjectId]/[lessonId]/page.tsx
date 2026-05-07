@@ -1,34 +1,24 @@
 import { prisma } from "@/lib/prisma";
 import { getOrCreateDbUser } from "@/lib/user";
 import { notFound } from "next/navigation";
-import AppHeader from "@/components/AppHeader";
+import AppLayout from "@/components/AppLayout";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight, CheckCircle2, Play, BookOpen, Clock } from "lucide-react";
 import Link from "next/link";
 import CompleteLessonButton from "@/components/CompleteLessonButton";
 
-export default async function LessonPage({
-  params,
-}: {
-  params: Promise<{ subjectId: string; lessonId: string }>;
-}) {
+export default async function LessonPage({ params }: { params: Promise<{ subjectId: string; lessonId: string }> }) {
   const { subjectId, lessonId } = await params;
   const user = await getOrCreateDbUser();
 
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
     include: {
-      subject: {
-        include: {
-          lessons: { orderBy: { order: "asc" } },
-          studyPlan: { select: { userId: true } },
-        },
-      },
+      subject: { include: { lessons: { orderBy: { order: "asc" } }, studyPlan: { select: { userId: true } } } },
       progress: { where: { userId: user.id } },
     },
   });
-
   if (!lesson || lesson.subject.studyPlan.userId !== user.id) notFound();
 
   const isCompleted = lesson.progress.some((p) => p.completedAt);
@@ -44,16 +34,15 @@ export default async function LessonPage({
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader active="aprender" />
-      <main className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+    <AppLayout active="aprender">
+      <div className="p-6 max-w-3xl mx-auto space-y-5">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Link href="/aprender" className="hover:text-foreground transition-colors">Aprender</Link>
+          <Link href="/aprender" className="hover:text-foreground">Aulas</Link>
           <span>/</span>
-          <Link href={`/aprender/${subjectId}`} className="hover:text-foreground transition-colors">{lesson.subject.name}</Link>
+          <Link href={`/aprender/${subjectId}`} className="hover:text-foreground">{lesson.subject.name}</Link>
           <span>/</span>
-          <span className="text-foreground truncate max-w-[200px]">{lesson.title}</span>
+          <span className="text-foreground truncate max-w-[150px]">{lesson.title}</span>
         </div>
 
         {/* Header */}
@@ -63,51 +52,46 @@ export default async function LessonPage({
               {lesson.type === "video" ? "Vídeo" : lesson.type === "reading" ? "Leitura" : "Exercício"}
             </Badge>
             <Badge variant="outline" className="border-white/10 text-muted-foreground text-xs">{lesson.subject.name}</Badge>
-            <Badge variant="outline" className="border-white/10 text-muted-foreground text-xs flex items-center gap-1"><Clock className="h-3 w-3" />{lesson.duration} min</Badge>
-            {isCompleted && <Badge className="gradient-neon text-black border-0 text-xs"><CheckCircle2 className="h-3 w-3 mr-1" />Concluído</Badge>}
+            <Badge variant="outline" className="border-white/10 text-muted-foreground text-xs flex items-center gap-1">
+              <Clock className="h-3 w-3" />{lesson.duration} min
+            </Badge>
+            {isCompleted && (
+              <Badge className="gradient-neon text-black border-0 text-xs">
+                <CheckCircle2 className="h-3 w-3 mr-1" />Concluído
+              </Badge>
+            )}
           </div>
           <h1 className="text-2xl font-bold">{lesson.title}</h1>
           <p className="text-muted-foreground text-sm">{lesson.topic}</p>
         </div>
 
-        {/* Video player placeholder */}
+        {/* Video player */}
         {lesson.type === "video" && (
-          <div className="rounded-2xl overflow-hidden border border-white/8 glow-card">
+          <div className="rounded-2xl overflow-hidden border border-white/8">
             <div className="aspect-video bg-gradient-to-br from-muted to-muted/50 flex flex-col items-center justify-center gap-4 relative">
               <div className="absolute inset-0 grid-pattern opacity-20" />
-              <div className="relative">
-                <div className="h-16 w-16 rounded-full gradient-neon glow-neon flex items-center justify-center cursor-pointer hover:scale-105 transition-transform">
-                  <Play className="h-7 w-7 text-black ml-1" />
-                </div>
+              <div className="relative h-16 w-16 rounded-full gradient-neon glow-neon flex items-center justify-center cursor-pointer hover:scale-105 transition-transform">
+                <Play className="h-7 w-7 text-black ml-1" />
               </div>
-              <div className="relative text-center">
-                <p className="text-sm font-medium text-foreground/80">{lesson.title}</p>
-                <p className="text-xs text-muted-foreground mt-1">{lesson.duration} minutos</p>
-              </div>
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
-                <div className="h-full gradient-neon w-0" />
-              </div>
+              <p className="relative text-sm text-muted-foreground">{lesson.duration} minutos</p>
             </div>
           </div>
         )}
 
         {/* Content */}
-        <Card className="glass-card border-white/5 glow-card">
-          <CardContent className="pt-6 pb-6">
+        <Card className="glass-card border-white/5">
+          <CardContent className="pt-5 pb-5">
             <div className="flex items-center gap-2 mb-4">
               <BookOpen className="h-4 w-4 text-primary" />
-              <span className="text-sm font-semibold text-foreground/80">Conteúdo da aula</span>
+              <span className="text-sm font-semibold">Conteúdo da aula</span>
             </div>
-            <div className="text-sm text-foreground/85 leading-relaxed whitespace-pre-wrap">
-              {lesson.content}
-            </div>
+            <div className="text-sm text-foreground/85 leading-relaxed whitespace-pre-wrap">{lesson.content}</div>
           </CardContent>
         </Card>
 
         {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
+        <div className="flex flex-col sm:flex-row gap-3 justify-between">
           <CompleteLessonButton lessonId={lesson.id} isCompleted={isCompleted} subjectId={subjectId} />
-
           <div className="flex gap-2">
             {prevLesson && (
               <Link href={`/aprender/${subjectId}/${prevLesson.id}`}>
@@ -128,7 +112,7 @@ export default async function LessonPage({
 
         {/* Progress bar */}
         <div className="glass-card rounded-xl p-4 border-white/5 space-y-2">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="flex justify-between text-xs text-muted-foreground">
             <span>{lesson.subject.name}</span>
             <span>{currentIdx + 1}/{allLessons.length}</span>
           </div>
@@ -140,7 +124,7 @@ export default async function LessonPage({
             ))}
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </AppLayout>
   );
 }

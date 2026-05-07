@@ -213,13 +213,15 @@
 /* ─── SIDEBAR LAYOUT ─── */
 .app-container {
   display: flex;
-  height: 100dvh;
-  overflow: hidden;
+  min-height: 100vh;
 }
 .sidebar {
   width: 240px;
   min-width: 240px;
-  height: 100%;
+  min-height: 100vh;
+  position: sticky;
+  top: 0;
+  height: 100vh;
   overflow-y: auto;
   background: var(--sidebar);
   border-right: 1px solid oklch(1 0 0 / 0.06);
@@ -229,8 +231,9 @@
 }
 .main-content {
   flex: 1;
-  overflow-y: auto;
   min-width: 0;
+  min-height: 100vh;
+  overflow-y: auto;
 }
 .sidebar-nav-item {
   display: flex;

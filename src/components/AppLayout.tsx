@@ -13,7 +13,7 @@ import {
 export type NavKey =
   | "dashboard" | "concursos" | "aprender" | "questoes" | "desafio"
   | "revisao" | "ranking" | "perfil" | "progresso" | "metas"
-  | "plano" | "ia";
+  | "plano" | "ia" | "materiais" | "simulado";
 
 const NAV_GROUPS = [
   {

@@ -16,8 +16,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <ClerkProvider>
-      <html lang="pt-BR" className={`${inter.variable} ${poppins.variable} ${geistMono.variable} antialiased`} style={{ height: "100dvh" }}>
-        <body className="bg-background text-foreground overflow-hidden" style={{ height: "100dvh" }}>
+      <html lang="pt-BR" className={`${inter.variable} ${poppins.variable} ${geistMono.variable} antialiased`}>
+        <body className="bg-background text-foreground">
           <TooltipProvider delay={200}>
             {children}
           </TooltipProvider>
