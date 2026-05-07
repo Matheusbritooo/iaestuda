@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Poppins, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import FloatingAiChat from "@/components/FloatingAiChat";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <body className="bg-background text-foreground">
           <TooltipProvider delay={200}>
             {children}
+            <FloatingAiChat />
           </TooltipProvider>
         </body>
       </html>
