@@ -175,6 +175,7 @@ model UserAnswer {
   isCorrect  Boolean
   timeSpent  Int      @default(0)
   mode       String   @default("treino")
+  confidence String   @default("unknown")
   answeredAt DateTime @default(now())
 
   user     User     @relation(fields: [userId], references: [id])

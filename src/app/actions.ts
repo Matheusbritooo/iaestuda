@@ -61,14 +61,82 @@ export async function addStudySession(subjectId: string, minutes: number) {
   revalidatePath("/");
 }
 
-export async function answerQuestion(questionId: string, optionId: string, timeSpent: number, mode = "treino") {
+export async function answerQuestion(
+  questionId: string,
+  optionId: string,
+  timeSpent: number,
+  mode = "treino",
+  confidence = "unknown"
+) {
   const userId = await getAuthenticatedUserId();
   const option = await prisma.questionOption.findUnique({ where: { id: optionId } });
   if (!option) return;
-  await prisma.userAnswer.create({ data: { userId, questionId, optionId, isCorrect: option.isCorrect, timeSpent, mode } });
+  await prisma.userAnswer.create({
+    data: { userId, questionId, optionId, isCorrect: option.isCorrect, timeSpent, mode, confidence },
+  });
   revalidatePath("/questoes");
   revalidatePath("/ranking");
   revalidatePath("/");
+}
+
+export async function explainQuestionWithAI(
+  questionContent: string,
+  options: { letter: string; text: string; isCorrect: boolean }[],
+  chosenLetter: string,
+  subjectName: string,
+  explanation: string
+): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return "IA não configurada.";
+
+  let userId: string | null = null;
+  try { userId = await getAuthenticatedUserId(); } catch { /* público */ }
+
+  let contextExtra = "";
+  try {
+    if (userId) {
+      const ctx = await buildUserContext(userId);
+      const subjectStat = ctx.performance.subjectStats.find(s => s.name === subjectName);
+      contextExtra = subjectStat
+        ? `\nO aluno tem ${subjectStat.hitRate}% de acerto em ${subjectName} (${subjectStat.answeredCount} questões respondidas).`
+        : "";
+    }
+  } catch { /* ignora */ }
+
+  const correctOption = options.find(o => o.isCorrect);
+  const chosenOption = options.find(o => o.letter === chosenLetter);
+
+  const prompt = `Questão de concurso — ${subjectName}:
+"${questionContent}"
+
+Resposta escolhida pelo aluno: ${chosenLetter}) ${chosenOption?.text ?? ""}
+Resposta correta: ${correctOption?.letter}) ${correctOption?.text ?? ""}
+Gabarito comentado: ${explanation}
+${contextExtra}
+
+Explique de forma didática e específica:
+1. Por que a resposta escolhida (${chosenLetter}) está errada
+2. Por que a resposta correta (${correctOption?.letter}) está certa
+3. A regra/conceito fundamental que o aluno deve revisar
+4. Uma dica prática para não errar esse tipo de questão novamente
+
+Seja direto, use exemplos práticos e máximo 200 palavras.`;
+
+  try {
+    const client = new Anthropic({ apiKey });
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 400,
+      system: `Você é um tutor especialista em concursos públicos brasileiros.
+Sua tarefa é explicar erros de questões de forma didática e personalizada.
+Responda sempre em português brasileiro, seja específico e use linguagem clara.`,
+      messages: [{ role: "user", content: prompt }],
+    });
+    const content = response.content[0];
+    return content.type === "text" ? content.text : "Não consegui gerar explicação.";
+  } catch (err) {
+    return `Erro: ${err instanceof Error ? err.message : "desconhecido"}`;
+  }
 }
 
 export async function completeLesson(lessonId: string, subjectId: string) {
