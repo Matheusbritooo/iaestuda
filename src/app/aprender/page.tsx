@@ -1,11 +1,21 @@
 import { prisma } from "@/lib/prisma";
 import { getOrCreateDbUser } from "@/lib/user";
-import AppHeader from "@/components/AppHeader";
+import AppLayout from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { BookOpen, Play, ChevronRight, Lock, CheckCircle2 } from "lucide-react";
+import { BookOpen, ChevronRight, CheckCircle2, Lock, Play, Clock } from "lucide-react";
 import Link from "next/link";
+
+const COLORS = [
+  "border-primary/20 bg-primary/4",
+  "border-secondary/20 bg-secondary/4",
+  "border-blue-400/20 bg-blue-400/4",
+  "border-amber-400/20 bg-amber-400/4",
+  "border-orange-400/20 bg-orange-400/4",
+  "border-violet-400/20 bg-violet-400/4",
+  "border-pink-400/20 bg-pink-400/4",
+];
 
 export default async function AprenderPage() {
   const user = await getOrCreateDbUser();
@@ -22,99 +32,94 @@ export default async function AprenderPage() {
     orderBy: { priority: "asc" },
   });
 
-  const totalLessons = subjects.reduce((a, s) => a + s.lessons.length, 0);
-  const completedLessons = subjects.reduce(
-    (a, s) => a + s.lessons.filter((l) => l.progress.some((p) => p.completedAt)).length, 0
-  );
-  const overallPct = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
-
-  const SUBJECT_COLORS = [
-    "from-primary/20 to-primary/5 border-primary/20",
-    "from-secondary/20 to-secondary/5 border-secondary/20",
-    "from-blue-400/20 to-blue-400/5 border-blue-400/20",
-    "from-amber-400/20 to-amber-400/5 border-amber-400/20",
-    "from-orange-400/20 to-orange-400/5 border-orange-400/20",
-  ];
+  const totalL = subjects.reduce((a, s) => a + s.lessons.length, 0);
+  const doneL = subjects.reduce((a, s) => a + s.lessons.filter((l) => l.progress.some((p) => p.completedAt)).length, 0);
+  const pct = totalL > 0 ? Math.round((doneL / totalL) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader active="aprender" />
-      <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+    <AppLayout active="aprender">
+      <div className="p-6 space-y-6 max-w-5xl mx-auto">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <BookOpen className="h-6 w-6 text-primary" />
-              <span className="text-gradient-neon">Aprender</span>
-            </h1>
-            <p className="text-muted-foreground mt-1 text-sm">Aulas organizadas por matéria e assunto</p>
+            <h1 className="text-2xl font-bold text-gradient-neon">Aulas</h1>
+            <p className="text-muted-foreground text-sm mt-0.5">Conteúdo estruturado por matéria e assunto</p>
           </div>
-          <div className="glass-card rounded-2xl px-4 py-3 border-neon text-center min-w-[130px]">
-            <p className="text-3xl font-bold text-gradient-neon">{overallPct}%</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{completedLessons}/{totalLessons} aulas</p>
-            <Progress value={overallPct} className="h-1 mt-2 bg-white/5" />
+          <div className="glass-card rounded-xl px-4 py-2.5 border-neon flex items-center gap-3">
+            <div>
+              <p className="text-xl font-bold text-gradient-neon">{pct}%</p>
+              <p className="text-[10px] text-muted-foreground">{doneL}/{totalL} aulas</p>
+            </div>
+            <Progress value={pct} className="w-20 h-1 bg-white/8" />
           </div>
         </div>
 
         {subjects.length === 0 ? (
-          <Card className="glass-card border-dashed border-white/10">
+          <Card className="glass-card border-dashed border-white/8">
             <CardContent className="py-16 text-center">
-              <BookOpen className="h-12 w-12 text-muted-foreground/20 mx-auto mb-4" />
-              <p className="text-muted-foreground">Configure seu plano para acessar as aulas</p>
-              <Link href="/plano"><Badge className="mt-4 gradient-neon text-black border-0 cursor-pointer">Criar plano</Badge></Link>
+              <BookOpen className="h-10 w-10 text-muted-foreground/20 mx-auto mb-3" />
+              <p className="text-muted-foreground text-sm">Carregando seu conteúdo...</p>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid md:grid-cols-2 gap-5">
+          <div className="grid md:grid-cols-2 gap-4">
             {subjects.map((subject, idx) => {
-              const completed = subject.lessons.filter((l) => l.progress.some((p) => p.completedAt)).length;
+              const done = subject.lessons.filter((l) => l.progress.some((p) => p.completedAt)).length;
               const total = subject.lessons.length;
-              const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+              const pct = total > 0 ? Math.round((done / total) * 100) : 0;
               const nextLesson = subject.lessons.find((l) => !l.progress.some((p) => p.completedAt));
-              const colorClass = SUBJECT_COLORS[idx % SUBJECT_COLORS.length];
+              const colorClass = COLORS[idx % COLORS.length];
 
               return (
-                <Card key={subject.id} className={`glass-card border overflow-hidden hover:scale-[1.01] transition-transform ${colorClass.split(" ").slice(2).join(" ")}`}>
-                  <div className={`h-1.5 w-full bg-gradient-to-r ${colorClass.split(" ").slice(0, 2).join(" ")}`} style={{ width: `${pct}%` }} />
+                <Card key={subject.id} className={`glass-card border overflow-hidden hover:scale-[1.01] transition-transform ${colorClass}`}>
                   <CardContent className="p-5 space-y-4">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <h2 className="font-bold text-base">{subject.name}</h2>
-                        <p className="text-xs text-muted-foreground mt-0.5">{completed}/{total} aulas · {subject._count.questions} questões</p>
+                        <h2 className="font-bold">{subject.name}</h2>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {done}/{total} aulas · {subject._count.questions} questões
+                        </p>
                       </div>
-                      <Badge variant="outline" className="border-white/10 text-xs shrink-0">{pct}%</Badge>
+                      <Badge variant="outline" className="border-white/8 text-xs shrink-0">
+                        {pct}%
+                      </Badge>
                     </div>
 
-                    <Progress value={pct} className="h-1 bg-white/5" />
+                    <div className="h-1 bg-white/6 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${pct >= 70 ? "gradient-neon" : pct >= 30 ? "gradient-purple" : "bg-white/15"}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
 
-                    {/* Lessons preview */}
-                    <div className="space-y-1.5">
+                    {/* Preview lessons */}
+                    <div className="space-y-1">
                       {subject.lessons.slice(0, 3).map((lesson, li) => {
                         const isDone = lesson.progress.some((p) => p.completedAt);
-                        const isPrev = li > 0 && !subject.lessons[li - 1].progress.some((p) => p.completedAt);
+                        const isLocked = li > 0 && !subject.lessons[li - 1].progress.some((p) => p.completedAt);
                         return (
                           <Link
                             key={lesson.id}
-                            href={isPrev ? "#" : `/aprender/${subject.id}/${lesson.id}`}
-                            className={`flex items-center gap-2.5 p-2.5 rounded-lg transition-colors group ${isPrev ? "opacity-40 cursor-not-allowed pointer-events-none" : "hover:bg-white/5"}`}
+                            href={isLocked ? "#" : `/aprender/${subject.id}/${lesson.id}`}
+                            className={`flex items-center gap-2 p-2 rounded-lg transition-colors group ${isLocked ? "opacity-35 cursor-not-allowed pointer-events-none" : "hover:bg-white/4"}`}
                           >
-                            <div className={`h-6 w-6 rounded-lg flex items-center justify-center shrink-0 ${isDone ? "gradient-neon" : isPrev ? "bg-white/5" : "bg-white/8"}`}>
-                              {isDone ? <CheckCircle2 className="h-3.5 w-3.5 text-black" /> : isPrev ? <Lock className="h-3 w-3 text-muted-foreground" /> : <Play className="h-3 w-3 text-muted-foreground" />}
+                            <div className={`h-5 w-5 rounded-md flex items-center justify-center shrink-0 ${isDone ? "gradient-neon" : "bg-white/7"}`}>
+                              {isDone ? <CheckCircle2 className="h-3 w-3 text-black" /> : isLocked ? <Lock className="h-2.5 w-2.5 text-muted-foreground" /> : <Play className="h-2.5 w-2.5 text-muted-foreground" />}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium truncate group-hover:text-primary transition-colors">{lesson.title}</p>
-                              <p className="text-[10px] text-muted-foreground">{lesson.topic} · {lesson.duration} min</p>
-                            </div>
+                            <span className="text-xs truncate text-foreground/70 group-hover:text-foreground">{lesson.title}</span>
+                            <span className="text-[10px] text-muted-foreground ml-auto shrink-0 flex items-center gap-0.5">
+                              <Clock className="h-2.5 w-2.5" />{lesson.duration}min
+                            </span>
                           </Link>
                         );
                       })}
-                      {subject.lessons.length > 3 && (
-                        <p className="text-xs text-muted-foreground text-center py-1">+{subject.lessons.length - 3} aulas</p>
-                      )}
+                      {total > 3 && <p className="text-xs text-muted-foreground text-center py-0.5">+{total - 3} aulas</p>}
                     </div>
 
-                    <Link href={`/aprender/${subject.id}`} className="flex items-center justify-between w-full gradient-neon text-black font-bold px-4 py-2.5 rounded-xl text-sm hover:opacity-90 transition-opacity">
-                      <span>{nextLesson ? "Continuar" : "Revisitar"}</span>
-                      <ChevronRight className="h-4 w-4" />
+                    <Link href={`/aprender/${subject.id}`}>
+                      <div className="flex items-center justify-between w-full gradient-neon text-black font-bold px-4 py-2 rounded-xl text-sm hover:opacity-90 transition-opacity">
+                        <span>{nextLesson ? "Continuar" : "Revisitar"}</span>
+                        <ChevronRight className="h-4 w-4" />
+                      </div>
                     </Link>
                   </CardContent>
                 </Card>
@@ -122,7 +127,7 @@ export default async function AprenderPage() {
             })}
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </AppLayout>
   );
 }

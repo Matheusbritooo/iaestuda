@@ -1,9 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { getOrCreateDbUser } from "@/lib/user";
 import { notFound } from "next/navigation";
-import AppHeader from "@/components/AppHeader";
+import AppLayout from "@/components/AppLayout";
 import QuestionSolver from "@/components/QuestionSolver";
-import { ArrowLeft, Target } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ChevronLeft, Target } from "lucide-react";
 import Link from "next/link";
 
 export default async function QuestionPage({ params }: { params: Promise<{ id: string }> }) {
@@ -18,30 +19,24 @@ export default async function QuestionPage({ params }: { params: Promise<{ id: s
       answers: { where: { userId: user.id }, orderBy: { answeredAt: "desc" }, take: 1 },
     },
   });
-
   if (!question) notFound();
 
   const nextQuestion = await prisma.question.findFirst({
-    where: {
-      subject: { studyPlan: { userId: user.id } },
-      id: { not: id },
-      answers: { none: { userId: user.id } },
-    },
+    where: { subject: { studyPlan: { userId: user.id } }, id: { not: id }, answers: { none: { userId: user.id } } },
     select: { id: true },
   });
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader active="questoes" />
-      <main className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+    <AppLayout active="questoes">
+      <div className="p-6 max-w-3xl mx-auto space-y-5">
         <div className="flex items-center justify-between">
           <Link href="/questoes" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="h-4 w-4" /> Banco de questões
+            <ChevronLeft className="h-4 w-4" /> Questões
           </Link>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm">
             <Target className="h-4 w-4 text-primary" />
             <span className="text-primary font-medium">{question.subject.name}</span>
-            <span>· {question.banca} {question.year ? `${question.year}` : ""}</span>
+            <Badge variant="outline" className="border-white/8 text-muted-foreground text-xs">{question.banca} {question.year}</Badge>
           </div>
         </div>
 
@@ -56,7 +51,7 @@ export default async function QuestionPage({ params }: { params: Promise<{ id: s
           }}
           nextQuestionId={nextQuestion?.id ?? null}
         />
-      </main>
-    </div>
+      </div>
+    </AppLayout>
   );
 }

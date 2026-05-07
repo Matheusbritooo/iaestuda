@@ -1,15 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { getOrCreateDbUser } from "@/lib/user";
+import AppLayout from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Target, Zap, CheckCircle2, XCircle, Clock, Filter } from "lucide-react";
+import { Target, CheckCircle2, XCircle, Clock, Filter } from "lucide-react";
 import Link from "next/link";
-import AppHeader from "@/components/AppHeader";
 
-const DIFFICULTY_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
-  easy: { label: "Fácil", color: "text-primary", dot: "bg-primary" },
-  medium: { label: "Médio", color: "text-amber-400", dot: "bg-amber-400" },
-  hard: { label: "Difícil", color: "text-red-400", dot: "bg-red-400" },
+const DIFF: Record<string, { label: string; dot: string; color: string }> = {
+  easy: { label: "Fácil", dot: "bg-emerald-400", color: "text-emerald-400" },
+  medium: { label: "Médio", dot: "bg-amber-400", color: "text-amber-400" },
+  hard: { label: "Difícil", dot: "bg-red-400", color: "text-red-400" },
 };
 
 export default async function QuestoesPage({
@@ -20,183 +20,162 @@ export default async function QuestoesPage({
   const user = await getOrCreateDbUser();
   const sp = await searchParams;
 
-  const subjects = await prisma.subject.findMany({
-    where: { studyPlan: { userId: user.id } },
-    select: { id: true, name: true },
-    orderBy: { priority: "asc" },
-  });
+  const [subjects, bancas, questions, stats] = await Promise.all([
+    prisma.subject.findMany({
+      where: { studyPlan: { userId: user.id } },
+      select: { id: true, name: true },
+      orderBy: { priority: "asc" },
+    }),
+    prisma.question.findMany({
+      where: { subject: { studyPlan: { userId: user.id } } },
+      select: { banca: true }, distinct: ["banca"],
+    }),
+    prisma.question.findMany({
+      where: {
+        subject: { studyPlan: { userId: user.id } },
+        ...(sp.subject ? { subjectId: sp.subject } : {}),
+        ...(sp.banca ? { banca: sp.banca } : {}),
+        ...(sp.difficulty ? { difficulty: sp.difficulty } : {}),
+      },
+      include: {
+        subject: { select: { name: true } },
+        answers: { where: { userId: user.id }, orderBy: { answeredAt: "desc" }, take: 1 },
+      },
+      orderBy: [{ subject: { priority: "asc" } }, { id: "asc" }],
+      take: 50,
+    }),
+    prisma.$transaction([
+      prisma.question.count({ where: { subject: { studyPlan: { userId: user.id } } } }),
+      prisma.userAnswer.count({ where: { userId: user.id } }),
+      prisma.userAnswer.count({ where: { userId: user.id, isCorrect: true } }),
+    ]),
+  ]);
 
-  const bancas = await prisma.question.findMany({
-    where: { subject: { studyPlan: { userId: user.id } } },
-    select: { banca: true },
-    distinct: ["banca"],
-  });
-
-  const questions = await prisma.question.findMany({
-    where: {
-      subject: { studyPlan: { userId: user.id } },
-      ...(sp.subject ? { subjectId: sp.subject } : {}),
-      ...(sp.banca ? { banca: sp.banca } : {}),
-      ...(sp.difficulty ? { difficulty: sp.difficulty } : {}),
-    },
-    include: {
-      subject: { select: { name: true } },
-      answers: { where: { userId: user.id }, orderBy: { answeredAt: "desc" }, take: 1 },
-    },
-    orderBy: { subject: { priority: "asc" } },
-    take: 50,
-  });
-
-  const stats = {
-    total: await prisma.question.count({ where: { subject: { studyPlan: { userId: user.id } } } }),
-    answered: await prisma.userAnswer.count({ where: { userId: user.id } }),
-    correct: await prisma.userAnswer.count({ where: { userId: user.id, isCorrect: true } }),
-  };
-  const hitRate = stats.answered > 0 ? Math.round((stats.correct / stats.answered) * 100) : 0;
+  const [total, answered, correct] = stats;
+  const hitRate = answered > 0 ? Math.round((correct / answered) * 100) : 0;
+  const unanswered = questions.filter((q) => !q.answers[0]).length;
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader active="questoes" />
-
-      <main className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+    <AppLayout active="questoes">
+      <div className="p-6 space-y-6 max-w-5xl mx-auto">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <span className="text-gradient-neon">Banco de Questões</span>
-            </h1>
-            <p className="text-muted-foreground mt-1 text-sm">Questões estilo prova real com feedback imediato</p>
+            <h1 className="text-2xl font-bold text-gradient-neon">Banco de Questões</h1>
+            <p className="text-muted-foreground text-sm mt-0.5">Questões CESPE, FCC e VUNESP com gabarito comentado</p>
           </div>
           <Link href="/questoes/simulado">
-            <div className="gradient-neon glow-neon text-black font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm hover:opacity-90 transition-opacity cursor-pointer">
-              <Zap className="h-4 w-4" /> Iniciar Simulado
+            <div className="gradient-neon glow-neon text-black font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 hover:opacity-90">
+              <Target className="h-4 w-4" /> Simulado
             </div>
           </Link>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-3">
           {[
-            { label: "Total de questões", value: stats.total, icon: Target, color: "text-primary" },
-            { label: "Respondidas", value: stats.answered, icon: CheckCircle2, color: "text-secondary" },
-            { label: "Taxa de acerto", value: `${hitRate}%`, icon: Zap, color: "text-amber-400" },
+            { label: "Total", value: total, color: "text-primary" },
+            { label: "Respondidas", value: answered, color: "text-secondary" },
+            { label: "Taxa de acerto", value: `${hitRate}%`, color: "text-amber-400" },
           ].map((s) => (
             <Card key={s.label} className="glass-card border-white/5">
-              <CardContent className="pt-4 pb-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <s.icon className={`h-4 w-4 ${s.color}`} />
-                  <p className="text-xs text-muted-foreground">{s.label}</p>
-                </div>
+              <CardContent className="pt-3 pb-3 text-center">
                 <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        <div className="flex gap-6">
-          {/* Sidebar filters */}
-          <aside className="w-52 shrink-0 space-y-4">
-            <div className="glass-card rounded-xl p-4 border-white/5 space-y-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-foreground/80">
-                <Filter className="h-3.5 w-3.5" /> Filtros
+        <div className="flex gap-5">
+          {/* Filters */}
+          <aside className="w-44 shrink-0">
+            <div className="glass-card rounded-xl p-3 border-white/5 space-y-4 sticky top-6">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                <Filter className="h-3 w-3" /> Filtros
               </div>
 
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Matéria</p>
-                <div className="space-y-1">
-                  <Link href={`/questoes?${new URLSearchParams({ ...sp, subject: "" })}`}>
-                    <div className={`text-xs px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${!sp.subject ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-white/5"}`}>
-                      Todas
-                    </div>
-                  </Link>
-                  {subjects.map((s) => (
-                    <Link key={s.id} href={`/questoes?${new URLSearchParams({ ...sp, subject: s.id })}`}>
-                      <div className={`text-xs px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors truncate ${sp.subject === s.id ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-white/5"}`}>
-                        {s.name}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Dificuldade</p>
-                <div className="space-y-1">
-                  {["", "easy", "medium", "hard"].map((d) => {
-                    const cfg = d ? DIFFICULTY_CONFIG[d] : null;
+              {[
+                {
+                  label: "Matéria",
+                  items: [{ id: "", name: "Todas" }, ...subjects.map((s) => ({ id: s.id, name: s.name }))],
+                  paramKey: "subject",
+                  currentValue: sp.subject ?? "",
+                },
+                {
+                  label: "Dificuldade",
+                  items: [
+                    { id: "", name: "Todas" },
+                    { id: "easy", name: "Fácil" },
+                    { id: "medium", name: "Médio" },
+                    { id: "hard", name: "Difícil" },
+                  ],
+                  paramKey: "difficulty",
+                  currentValue: sp.difficulty ?? "",
+                },
+              ].map((group) => (
+                <div key={group.label} className="space-y-1">
+                  <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">{group.label}</p>
+                  {group.items.map((item) => {
+                    const params = new URLSearchParams({ ...sp, [group.paramKey]: item.id });
                     return (
-                      <Link key={d} href={`/questoes?${new URLSearchParams({ ...sp, difficulty: d })}`}>
-                        <div className={`text-xs px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors flex items-center gap-2 ${sp.difficulty === d || (!sp.difficulty && !d) ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-white/5"}`}>
-                          {cfg && <div className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />}
-                          {cfg ? cfg.label : "Todas"}
+                      <Link key={item.id} href={`/questoes?${params}`}>
+                        <div className={`text-xs px-2 py-1 rounded-lg cursor-pointer transition-colors truncate ${group.currentValue === item.id || (!group.currentValue && !item.id) ? "bg-primary/12 text-primary" : "text-muted-foreground hover:bg-white/5"}`}>
+                          {item.name}
                         </div>
                       </Link>
                     );
                   })}
                 </div>
-              </div>
-
-              {bancas.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Banca</p>
-                  <div className="space-y-1">
-                    <Link href={`/questoes?${new URLSearchParams({ ...sp, banca: "" })}`}>
-                      <div className={`text-xs px-2.5 py-1.5 rounded-lg cursor-pointer ${!sp.banca ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-white/5"}`}>Todas</div>
-                    </Link>
-                    {bancas.map((b) => (
-                      <Link key={b.banca} href={`/questoes?${new URLSearchParams({ ...sp, banca: b.banca })}`}>
-                        <div className={`text-xs px-2.5 py-1.5 rounded-lg cursor-pointer ${sp.banca === b.banca ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-white/5"}`}>{b.banca}</div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
+              ))}
             </div>
           </aside>
 
-          {/* Questions list */}
-          <div className="flex-1 space-y-3">
+          {/* Questions */}
+          <div className="flex-1 space-y-2.5">
+            {unanswered > 0 && (
+              <div className="glass rounded-xl px-3 py-2 border-primary/15 text-xs text-primary flex items-center gap-2">
+                <Target className="h-3.5 w-3.5" />
+                <span><strong>{unanswered}</strong> questões não respondidas nesta seleção</span>
+              </div>
+            )}
+
             {questions.length === 0 ? (
-              <Card className="glass-card border-dashed border-white/10">
+              <Card className="glass-card border-dashed border-white/8">
                 <CardContent className="py-16 text-center">
-                  <Target className="h-12 w-12 text-muted-foreground/20 mx-auto mb-4" />
-                  <p className="text-muted-foreground">Nenhuma questão encontrada</p>
-                  <p className="text-xs text-muted-foreground/60 mt-1">Configure seu plano de estudos para acessar questões</p>
+                  <Target className="h-10 w-10 text-muted-foreground/20 mx-auto mb-3" />
+                  <p className="text-muted-foreground text-sm">Nenhuma questão encontrada</p>
                 </CardContent>
               </Card>
             ) : (
               questions.map((q, idx) => {
                 const answered = q.answers[0];
-                const cfg = DIFFICULTY_CONFIG[q.difficulty];
+                const diff = DIFF[q.difficulty];
                 return (
                   <Link key={q.id} href={`/questoes/${q.id}`}>
-                    <div className="glass-card border-white/5 rounded-xl p-4 hover:border-white/10 hover:-translate-y-0.5 transition-all group cursor-pointer flex items-start gap-4">
+                    <div className="glass-card border-white/5 rounded-xl p-4 hover:border-white/10 hover:-translate-y-0.5 transition-all group flex items-start gap-4">
+                      <span className="text-xs text-muted-foreground/40 font-mono mt-0.5 shrink-0">{String(idx + 1).padStart(2, "0")}</span>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2 flex-wrap">
-                          <Badge variant="outline" className="text-[10px] border-white/10 text-muted-foreground">
-                            {q.subject.name}
-                          </Badge>
-                          <Badge variant="outline" className="text-[10px] border-white/10 text-muted-foreground">
-                            {q.banca} {q.year ? `· ${q.year}` : ""}
-                          </Badge>
-                          {cfg && (
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                          <Badge variant="outline" className="text-[10px] border-white/8 text-muted-foreground">{q.subject.name}</Badge>
+                          <Badge variant="outline" className="text-[10px] border-white/8 text-muted-foreground">{q.banca}</Badge>
+                          {diff && (
                             <div className="flex items-center gap-1">
-                              <div className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
-                              <span className={`text-[10px] ${cfg.color}`}>{cfg.label}</span>
+                              <div className={`h-1.5 w-1.5 rounded-full ${diff.dot}`} />
+                              <span className={`text-[10px] ${diff.color}`}>{diff.label}</span>
                             </div>
                           )}
                         </div>
-                        <p className="text-sm text-foreground/90 line-clamp-2 group-hover:text-foreground transition-colors">
-                          <span className="text-muted-foreground mr-1">{idx + 1}.</span>
+                        <p className="text-sm text-foreground/85 line-clamp-2 group-hover:text-foreground transition-colors">
                           {q.content}
                         </p>
                       </div>
-                      <div className="shrink-0 mt-1">
+                      <div className="shrink-0">
                         {answered ? (
                           answered.isCorrect
-                            ? <CheckCircle2 className="h-5 w-5 text-primary" />
-                            : <XCircle className="h-5 w-5 text-destructive" />
+                            ? <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                            : <XCircle className="h-4 w-4 text-red-400" />
                         ) : (
-                          <Clock className="h-5 w-5 text-muted-foreground/30" />
+                          <Clock className="h-4 w-4 text-muted-foreground/25" />
                         )}
                       </div>
                     </div>
@@ -206,7 +185,7 @@ export default async function QuestoesPage({
             )}
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </AppLayout>
   );
 }
