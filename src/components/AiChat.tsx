@@ -65,13 +65,26 @@ export default function AiChat({ starters }: { starters?: string[] }) {
           return updated;
         });
       }
+
+      // If response was error status, show what came back
+      if (!response.ok && accumulated) {
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            role: "assistant",
+            content: `⚠️ ${accumulated}`,
+            agentId: selectedAgent.id,
+          };
+          return updated;
+        });
+      }
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
         setMessages((prev) => {
           const updated = [...prev];
           updated[updated.length - 1] = {
             role: "assistant",
-            content: "Ocorreu um erro. Verifique se a chave ANTHROPIC_API_KEY está configurada.",
+            content: `⚠️ Erro ao conectar: ${(err as Error).message}. Tente novamente.`,
             agentId: selectedAgent.id,
           };
           return updated;

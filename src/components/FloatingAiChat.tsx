@@ -71,10 +71,13 @@ export default function FloatingAiChat() {
       }
 
       if (!open) setUnread((n) => n + 1);
-    } catch {
+    } catch (err) {
       setMessages((prev) => {
         const updated = [...prev];
-        updated[updated.length - 1] = { role: "assistant", content: "Erro ao conectar com a IA." };
+        updated[updated.length - 1] = {
+          role: "assistant",
+          content: `⚠️ ${(err as Error).name === "AbortError" ? "Cancelado." : "Erro ao conectar. Tente novamente."}`,
+        };
         return updated;
       });
     } finally {
