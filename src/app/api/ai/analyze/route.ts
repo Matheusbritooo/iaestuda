@@ -1,43 +1,43 @@
-import { currentUser } from "@clerk/nextjs/server";
+import type { NextRequest } from "next/server";
+import { getAuth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { buildUserContext, contextToSystemPrompt } from "@/lib/ai-context";
 import Anthropic from "@anthropic-ai/sdk";
 
-const ANALYSIS_ROLE = `Você é o Analista de Performance IA da plataforma IAEstuda.
-Analise os dados do aluno e produza um relatório com:
+const ROLE = `Você é o Analista de Performance IA da plataforma IAEstuda.
+Produza um relatório personalizado com:
 
-1. **Diagnóstico Geral** (2-3 linhas)
-2. **Ponto Crítico**: o que mais precisa de atenção agora
-3. **Pontos Fortes**: o que está indo bem
-4. **Recomendação da Semana**: 1 ação concreta para os próximos 7 dias
+1. **Diagnóstico** (2-3 linhas sobre situação atual)
+2. **Ponto Crítico** (o que mais precisa de atenção agora e por quê)
+3. **Forças** (o que está indo bem — cite dados específicos)
+4. **Ação da Semana** (1 tarefa concreta e mensurável)
 
-Use dados reais, evite frases genéricas. Máximo 200 palavras.`;
+Seja específico, use dados reais do aluno, máximo 200 palavras.`;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) return new Response("ANTHROPIC_API_KEY não configurada", { status: 500 });
+    if (!apiKey) return new Response("Chave de IA não configurada", { status: 500 });
 
-    const clerkUser = await currentUser();
-    if (!clerkUser) return new Response("Não autenticado", { status: 401 });
+    const { userId: clerkId } = getAuth(req);
+    if (!clerkId) return new Response("Não autenticado", { status: 401 });
 
-    const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
-    const dbUser = await prisma.user.findFirst({
-      where: { OR: [{ id: clerkUser.id }, ...(email ? [{ email }] : [])] },
-      select: { id: true },
-    });
+    const dbUser = await prisma.user.findFirst({ where: { id: clerkId }, select: { id: true } });
 
     let systemPrompt: string;
-    if (dbUser) {
-      const ctx = await buildUserContext(dbUser.id);
-      systemPrompt = contextToSystemPrompt(ctx, ANALYSIS_ROLE);
-    } else {
-      systemPrompt = `${ANALYSIS_ROLE}\nAluno: ${clerkUser.firstName ?? "Aluno"}. Dados ainda sendo carregados.`;
+    try {
+      if (dbUser) {
+        const ctx = await buildUserContext(dbUser.id);
+        systemPrompt = contextToSystemPrompt(ctx, ROLE);
+      } else {
+        systemPrompt = `${ROLE}\nAluno em início de jornada.`;
+      }
+    } catch {
+      systemPrompt = `${ROLE}\nDados sendo carregados.`;
     }
 
     const client = new Anthropic({ apiKey });
     const encoder = new TextEncoder();
-
     const stream = new ReadableStream({
       async start(controller) {
         try {
@@ -45,12 +45,11 @@ export async function GET() {
             model: "claude-haiku-4-5-20251001",
             max_tokens: 400,
             system: systemPrompt,
-            messages: [{ role: "user", content: "Gere minha análise de desempenho agora." }],
+            messages: [{ role: "user", content: "Gere minha análise de desempenho." }],
           });
           for await (const event of response) {
-            if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            if (event.type === "content_block_delta" && event.delta.type === "text_delta")
               controller.enqueue(encoder.encode(event.delta.text));
-            }
           }
           controller.close();
         } catch (err) {
@@ -59,7 +58,6 @@ export async function GET() {
         }
       },
     });
-
     return new Response(stream, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
   } catch (err) {
     return new Response(err instanceof Error ? err.message : "Erro", { status: 500 });

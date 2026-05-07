@@ -1,30 +1,27 @@
-import { currentUser } from "@clerk/nextjs/server";
+import type { NextRequest } from "next/server";
+import { getAuth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { buildUserContext, contextToSystemPrompt } from "@/lib/ai-context";
 import { getAgent, type AgentId } from "@/lib/agents";
 import Anthropic from "@anthropic-ai/sdk";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       return new Response(
-        "IA não configurada. Adicione ANTHROPIC_API_KEY nas variáveis de ambiente.",
+        "IA não configurada. Chave ANTHROPIC_API_KEY ausente.",
         { status: 500 }
       );
     }
 
-    // Get Clerk user (works in Route Handlers)
-    const clerkUser = await currentUser();
-    if (!clerkUser) {
-      return new Response("Faça login para usar a IA.", { status: 401 });
+    const { userId: clerkId } = getAuth(req);
+    if (!clerkId) {
+      return new Response("Não autenticado. Faça login.", { status: 401 });
     }
 
-    const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
-
-    // Find user by ID or email (robustness for keyless mode)
     const dbUser = await prisma.user.findFirst({
-      where: { OR: [{ id: clerkUser.id }, ...(email ? [{ email }] : [])] },
+      where: { id: clerkId },
       select: { id: true },
     });
 
@@ -35,17 +32,16 @@ export async function POST(req: Request) {
 
     const agent = getAgent(body.agentId ?? "tutor");
 
-    // Build context — fallback to generic if DB user not found
     let systemPrompt: string;
-    if (dbUser) {
-      try {
+    try {
+      if (dbUser) {
         const ctx = await buildUserContext(dbUser.id);
         systemPrompt = contextToSystemPrompt(ctx, agent.role);
-      } catch {
-        systemPrompt = buildFallbackPrompt(agent.role, clerkUser.firstName ?? "Aluno");
+      } else {
+        systemPrompt = buildBasePrompt(agent.role);
       }
-    } else {
-      systemPrompt = buildFallbackPrompt(agent.role, clerkUser.firstName ?? "Aluno");
+    } catch {
+      systemPrompt = buildBasePrompt(agent.role);
     }
 
     const client = new Anthropic({ apiKey });
@@ -60,19 +56,16 @@ export async function POST(req: Request) {
             system: systemPrompt,
             messages: body.messages,
           });
-
           for await (const event of response) {
-            if (
-              event.type === "content_block_delta" &&
-              event.delta.type === "text_delta"
-            ) {
+            if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
               controller.enqueue(encoder.encode(event.delta.text));
             }
           }
           controller.close();
         } catch (err) {
-          const msg = err instanceof Error ? err.message : "Erro ao chamar Claude";
-          controller.enqueue(encoder.encode(`Erro: ${msg}`));
+          controller.enqueue(
+            encoder.encode(`Erro ao chamar a IA: ${err instanceof Error ? err.message : "desconhecido"}`)
+          );
           controller.close();
         }
       },
@@ -82,23 +75,26 @@ export async function POST(req: Request) {
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Erro interno";
-    return new Response(msg, { status: 500 });
+    return new Response(
+      `Erro: ${err instanceof Error ? err.message : "interno"}`,
+      { status: 500 }
+    );
   }
 }
 
-function buildFallbackPrompt(agentRole: string, name: string): string {
+function buildBasePrompt(role: string): string {
   return `Você é o IAestuda AI — tutor especialista em concursos públicos brasileiros.
-${agentRole}
+${role}
 
-Aluno: ${name}
 Especialidades: Português, Direito Constitucional, Direito Administrativo,
 Raciocínio Lógico, Matemática, Informática, Atualidades.
+Concursos: INSS, TRF, PF, Receita Federal, PRF, Caixa, BB.
 
 Regras:
 - Responda SEMPRE em português brasileiro
-- Seja direto, didático e específico
-- Use exemplos práticos de questões de concurso
-- Estruture respostas com tópicos claros
+- Seja didático, específico e use exemplos práticos
+- Estruture respostas com tópicos e bullet points
+- Use mnemônicos quando ajudar a memorizar
+- Cite a banca relevante (CESPE, FCC, VUNESP)
 - Máximo 400 palavras`;
 }
