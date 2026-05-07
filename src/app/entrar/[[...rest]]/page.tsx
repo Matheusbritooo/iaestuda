@@ -1,73 +1,71 @@
 import { SignIn } from "@clerk/nextjs";
-import { Brain, Zap, Target, TrendingUp, Users, Star } from "lucide-react";
+import { Brain, CheckCircle2, Star, Users, Zap, Target, BarChart3, TrendingUp } from "lucide-react";
 
-const stats = [
-  { value: "94%", label: "taxa de aprovação" },
-  { value: "48k+", label: "alunos ativos" },
-  { value: "2.1M", label: "questões resolvidas" },
-  { value: "4.9★", label: "avaliação" },
+const FEATURES = [
+  { icon: Target, text: "Banco de questões CESPE, FCC e VUNESP" },
+  { icon: Brain, text: "IA Tutor personalizado por matéria" },
+  { icon: BarChart3, text: "Dashboard estilo trading em tempo real" },
+  { icon: TrendingUp, text: "Ranking global com gamificação" },
 ];
 
-const features = [
-  { icon: Target, label: "Banco de questões por banca" },
-  { icon: Brain, label: "IA que explica seus erros" },
-  { icon: TrendingUp, label: "Dashboard estilo trading" },
-  { icon: Zap, label: "Revisão espaçada com IA" },
+const STATS = [
+  { value: "48k+", label: "aprovados" },
+  { value: "94%", label: "satisfação" },
+  { value: "2.1M", label: "questões respondidas" },
+  { value: "4.9★", label: "avaliação" },
 ];
 
 export default function SignInPage() {
   return (
     <div className="min-h-screen flex bg-background">
-      {/* Left — branding */}
-      <div className="hidden lg:flex lg:w-3/5 flex-col justify-between p-14 relative overflow-hidden gradient-hero">
-        <div className="absolute inset-0 grid-pattern" />
-        <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full bg-primary/6 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full bg-secondary/8 blur-3xl pointer-events-none" />
+      {/* Left panel */}
+      <div className="hidden lg:flex lg:w-[58%] flex-col justify-between p-14 relative overflow-hidden">
+        <div className="absolute inset-0 gradient-hero" />
+        <div className="absolute inset-0 grid-pattern opacity-25" />
+        <div className="absolute -top-40 -left-20 w-[500px] h-[500px] rounded-full bg-primary/6 blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-96 h-96 rounded-full bg-secondary/8 blur-3xl pointer-events-none" />
 
         {/* Logo */}
         <div className="relative flex items-center gap-3">
-          <div className="p-2.5 rounded-xl gradient-neon glow-neon">
+          <div className="p-2.5 rounded-xl gradient-neon glow-neon animate-pulse-neon">
             <Brain className="h-5 w-5 text-black" />
           </div>
           <div>
             <span className="font-bold text-xl text-gradient-neon">IAestuda</span>
-            <p className="text-[11px] text-muted-foreground leading-none mt-0.5">Powered by IA · Premium</p>
+            <p className="text-[11px] text-muted-foreground leading-none mt-0.5">A plataforma #1 para concursos</p>
           </div>
         </div>
 
-        {/* Hero text */}
-        <div className="relative space-y-10">
-          <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 glass rounded-full px-3 py-1.5 text-xs text-primary font-medium border-neon">
-              <Star className="h-3 w-3" />
+        {/* Hero */}
+        <div className="relative space-y-8">
+          <div className="space-y-5">
+            <div className="inline-flex items-center gap-2 glass rounded-full px-4 py-2 text-xs text-primary font-medium border-neon">
+              <Star className="h-3.5 w-3.5 fill-primary" />
               #1 Plataforma de Concursos do Brasil
             </div>
-            <h1 className="text-5xl font-bold leading-[1.1]">
-              Estude como
+            <h1 className="text-5xl font-bold leading-[1.08]">
+              Estude como os
               <br />
-              <span className="text-gradient-neon">os aprovados</span>
+              <span className="text-gradient-full">aprovados</span>
               <br />
               estudam.
             </h1>
             <p className="text-muted-foreground text-lg leading-relaxed max-w-md">
-              Tecnologia de ponta, gamificação real e IA que te conhece.
-              Transforme horas de estudo em aprovação.
+              IA personalizada, simulados reais e gamificação que torna o estudo viciante. Mais de 48 mil aprovados.
             </p>
           </div>
 
-          {/* Feature pills */}
-          <div className="grid grid-cols-2 gap-2">
-            {features.map((f) => (
-              <div key={f.label} className="glass flex items-center gap-2.5 rounded-xl px-3.5 py-2.5">
+          <div className="grid grid-cols-2 gap-2.5">
+            {FEATURES.map((f) => (
+              <div key={f.text} className="glass flex items-center gap-2.5 rounded-xl px-3.5 py-3 border-white/8">
                 <f.icon className="h-4 w-4 text-primary shrink-0" />
-                <span className="text-sm text-foreground/90">{f.label}</span>
+                <span className="text-sm text-foreground/90">{f.text}</span>
               </div>
             ))}
           </div>
 
-          {/* Stats bar */}
-          <div className="glass rounded-2xl p-5 grid grid-cols-4 gap-4">
-            {stats.map((s) => (
+          <div className="glass rounded-2xl p-5 grid grid-cols-4 gap-3">
+            {STATS.map((s) => (
               <div key={s.label} className="text-center">
                 <p className="text-xl font-bold text-gradient-neon">{s.value}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">{s.label}</p>
@@ -75,56 +73,54 @@ export default function SignInPage() {
             ))}
           </div>
 
-          {/* Testimonial */}
           <div className="glass rounded-xl p-4 flex items-start gap-3 border-neon">
-            <div className="h-9 w-9 rounded-full gradient-neon flex items-center justify-center shrink-0 text-black font-bold text-sm">
-              A
-            </div>
+            <div className="h-9 w-9 rounded-xl gradient-neon flex items-center justify-center shrink-0 text-black font-bold text-sm">A</div>
             <div>
               <p className="text-sm text-foreground/90 leading-relaxed">
-                &ldquo;Aprovada no TRT em 5 meses. O dashboard de progresso e os simulados foram decisivos.&rdquo;
+                &ldquo;Passei no TRF em 5 meses. O IA Tutor me explicava os erros em segundos. Impossível sem o IAestuda.&rdquo;
               </p>
               <p className="text-xs text-primary font-medium mt-1 flex items-center gap-1">
-                <Users className="h-3 w-3" /> Ana S. · Aprovada TRT 2025
+                <Users className="h-3 w-3" /> Ana S. · Aprovada TRF 2025
               </p>
             </div>
           </div>
         </div>
 
-        <p className="relative text-xs text-muted-foreground">
-          © 2025 IAestuda · Tecnologia para aprovação
-        </p>
+        <p className="relative text-xs text-muted-foreground">© 2025 IAestuda · Tecnologia para aprovação</p>
       </div>
 
-      {/* Right — form */}
+      {/* Right panel */}
       <div className="flex-1 flex flex-col items-center justify-center px-8 py-12">
-        <div className="w-full max-w-sm space-y-7">
+        <div className="w-full max-w-[360px] space-y-7">
           <div className="lg:hidden flex items-center gap-2 mb-4">
-            <div className="p-1.5 rounded-lg gradient-neon">
-              <Brain className="h-4 w-4 text-black" />
-            </div>
+            <div className="p-1.5 rounded-lg gradient-neon"><Brain className="h-4 w-4 text-black" /></div>
             <span className="font-bold text-lg text-gradient-neon">IAestuda</span>
           </div>
 
           <div>
             <h2 className="text-2xl font-bold">Bem-vindo de volta</h2>
-            <p className="text-muted-foreground text-sm mt-1">Acesse sua conta e continue evoluindo</p>
+            <p className="text-muted-foreground text-sm mt-1">Entre com Google em 1 clique</p>
           </div>
 
           <SignIn
             appearance={{
+              layout: { socialButtonsPlacement: "top", socialButtonsVariant: "blockButton" },
               elements: {
                 rootBox: "w-full",
                 card: "shadow-none border-0 p-0 bg-transparent w-full",
                 headerTitle: "hidden",
                 headerSubtitle: "hidden",
-                socialButtonsBlockButton: "border border-white/10 hover:bg-white/5 rounded-xl h-10 text-sm font-medium text-foreground bg-white/3 transition-all",
-                dividerRow: "my-5",
+                socialButtonsBlockButton:
+                  "border border-white/10 hover:bg-white/8 hover:border-primary/30 rounded-xl h-11 text-sm font-semibold text-foreground bg-white/4 transition-all duration-200 mb-2",
+                socialButtonsBlockButtonText: "font-semibold",
+                dividerRow: "my-4",
                 dividerLine: "bg-white/8",
                 dividerText: "text-muted-foreground text-xs",
-                formFieldInput: "bg-white/5 border border-white/10 rounded-xl h-10 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:ring-0 transition-colors",
+                formFieldInput:
+                  "bg-white/5 border border-white/10 rounded-xl h-10 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:ring-0 focus:bg-white/8 transition-all",
                 formFieldLabel: "text-sm font-medium text-foreground/80",
-                formButtonPrimary: "gradient-neon hover:opacity-90 rounded-xl h-10 text-sm font-bold text-black glow-neon transition-all",
+                formButtonPrimary:
+                  "gradient-neon hover:opacity-90 rounded-xl h-10 text-sm font-bold text-black glow-neon transition-all",
                 footerActionLink: "text-primary font-medium hover:text-primary/80",
                 identityPreviewText: "text-sm text-foreground",
                 alertText: "text-sm",
@@ -132,6 +128,19 @@ export default function SignInPage() {
               },
             }}
           />
+
+          <div className="flex items-center justify-center gap-4 pt-2">
+            {[
+              { text: "Seguro" },
+              { text: "Gratuito para começar" },
+              { text: "Sem cartão" },
+            ].map((item) => (
+              <div key={item.text} className="flex items-center gap-1 text-xs text-muted-foreground">
+                <CheckCircle2 className="h-3 w-3 text-primary" />
+                {item.text}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
