@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getOrCreateDbUser } from "@/lib/user";
 import { getLevelInfo } from "@/lib/level";
 import { Progress } from "@/components/ui/progress";
+import { SidebarWrapper } from "@/components/SidebarClient";
 import {
   Brain, BarChart3, Target, BookOpen, BrainCircuit, Trophy,
   TrendingUp, Zap, Flame, User, Sparkles, GraduationCap,
@@ -80,8 +81,8 @@ export default async function AppLayout({
 
   return (
     <div className="app-container">
-      {/* ── SIDEBAR ── */}
-      <aside className="sidebar">
+      {/* ── SIDEBAR (com toggle mobile) ── */}
+      <SidebarWrapper>
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="px-4 pt-5 pb-3 border-b border-white/5">
@@ -174,10 +175,10 @@ export default async function AppLayout({
             </div>
           </div>
         </div>
-      </aside>
+      </SidebarWrapper>
 
       {/* ── MAIN CONTENT ── */}
-      <main className="main-content">
+      <main className="main-content pt-12 lg:pt-0">
         {children}
       </main>
     </div>
