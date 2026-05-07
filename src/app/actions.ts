@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { startOfDay } from "date-fns";
 import Anthropic from "@anthropic-ai/sdk";
+import { buildUserContext, contextToSystemPrompt } from "@/lib/ai-context";
+import { getAgent, type AgentId } from "@/lib/agents";
 
 async function getAuthenticatedUserId() {
   const { userId: clerkId } = await auth();
@@ -18,7 +20,6 @@ export async function reviewFlashcard(cardId: string, quality: 0 | 1 | 2 | 3 | 4
   const userId = await getAuthenticatedUserId();
   const card = await prisma.flashcard.findUnique({ where: { id: cardId } });
   if (!card || card.userId !== userId) return;
-
   let { easeFactor, interval, repetitions } = card;
   if (quality < 3) { repetitions = 0; interval = 1; }
   else {
@@ -64,9 +65,7 @@ export async function answerQuestion(questionId: string, optionId: string, timeS
   const userId = await getAuthenticatedUserId();
   const option = await prisma.questionOption.findUnique({ where: { id: optionId } });
   if (!option) return;
-  await prisma.userAnswer.create({
-    data: { userId, questionId, optionId, isCorrect: option.isCorrect, timeSpent, mode },
-  });
+  await prisma.userAnswer.create({ data: { userId, questionId, optionId, isCorrect: option.isCorrect, timeSpent, mode } });
   revalidatePath("/questoes");
   revalidatePath("/ranking");
   revalidatePath("/");
@@ -85,23 +84,153 @@ export async function completeLesson(lessonId: string, subjectId: string) {
   revalidatePath("/");
 }
 
+// ─── IA ACTIONS (Server Actions — auth garantida) ───
+
+function buildBaseSystemPrompt(role: string): string {
+  return `Você é o IAestuda AI — tutor especialista em concursos públicos brasileiros.
+${role}
+
+Concursos: INSS, TRF, PF, Receita Federal, PRF, Caixa, BB.
+Matérias: Português, Direito Constitucional, Direito Administrativo,
+Raciocínio Lógico, Matemática, Informática, Atualidades.
+
+Regras obrigatórias:
+- Responda SEMPRE em português brasileiro
+- Seja didático, específico e use exemplos práticos de concurso
+- Estruture com tópicos, bullets e formatação clara
+- Cite a banca (CESPE, FCC, VUNESP) quando relevante
+- Use mnemônicos para memorização
+- Máximo 500 palavras por resposta`;
+}
+
+export async function sendChatMessage(
+  messages: { role: "user" | "assistant"; content: string }[],
+  agentId: string = "tutor"
+): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return "⚠️ IA não configurada. Chave ANTHROPIC_API_KEY ausente.";
+
+  let userId: string | null = null;
+  try { userId = await getAuthenticatedUserId(); } catch { /* público */ }
+
+  const agent = getAgent(agentId as AgentId);
+
+  let systemPrompt: string;
+  try {
+    if (userId) {
+      const ctx = await buildUserContext(userId);
+      systemPrompt = contextToSystemPrompt(ctx, agent.role);
+    } else {
+      systemPrompt = buildBaseSystemPrompt(agent.role);
+    }
+  } catch {
+    systemPrompt = buildBaseSystemPrompt(agent.role);
+  }
+
+  try {
+    const client = new Anthropic({ apiKey });
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages,
+    });
+    const content = response.content[0];
+    return content.type === "text" ? content.text : "Não consegui gerar uma resposta.";
+  } catch (err) {
+    return `⚠️ Erro ao chamar a IA: ${err instanceof Error ? err.message : "desconhecido"}`;
+  }
+}
+
+export async function generateAiAnalysis(): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return "⚠️ IA não configurada.";
+
+  let userId: string | null = null;
+  try { userId = await getAuthenticatedUserId(); } catch { /* não autenticado */ }
+
+  const ROLE = `Você é o Analista de Performance IA. Produza um relatório com:
+
+1. **Diagnóstico** (2-3 linhas)
+2. **Ponto Crítico** (o que precisa de atenção)
+3. **Forças** (o que está indo bem)
+4. **Ação da Semana** (1 tarefa concreta)
+
+Máximo 200 palavras. Use dados reais do aluno.`;
+
+  let systemPrompt = buildBaseSystemPrompt(ROLE);
+  try {
+    if (userId) {
+      const ctx = await buildUserContext(userId);
+      systemPrompt = contextToSystemPrompt(ctx, ROLE);
+    }
+  } catch { /* usa fallback */ }
+
+  try {
+    const client = new Anthropic({ apiKey });
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 400,
+      system: systemPrompt,
+      messages: [{ role: "user", content: "Gere minha análise de desempenho." }],
+    });
+    const content = response.content[0];
+    return content.type === "text" ? content.text : "";
+  } catch (err) {
+    return `⚠️ ${err instanceof Error ? err.message : "Erro"}`;
+  }
+}
+
+export async function generateStudyPlan(): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return "⚠️ IA não configurada.";
+
+  let userId: string | null = null;
+  try { userId = await getAuthenticatedUserId(); } catch { /* não autenticado */ }
+
+  const ROLE = `Você é o Planejador Inteligente. Crie um cronograma semanal detalhado.
+
+Formato exato:
+📅 CRONOGRAMA — [Nome] | [Concurso] | [N] semanas
+
+SEG │ [Matéria]  │ 2h │ [tópico específico]
+TER │ [Matéria]  │ 2h │ [tópico específico]
+QUA │ [Matéria]  │ 2h │ [tópico específico]
+QUI │ [Matéria]  │ 2h │ [tópico específico]
+SEX │ [Matéria]  │ 2h │ [tópico específico]
+SAB │ Revisão + Simulado │ 4h │ [matérias]
+DOM │ Descanso ativo │ — │ Leitura leve
+
+⚡ PRIORIDADE: [matéria mais urgente — motivo]
+🎯 META: [algo mensurável para a semana]
+💡 DICA: [insight baseado nos dados]
+
+Priorize matérias com menor taxa de acerto.`;
+
+  let systemPrompt = buildBaseSystemPrompt(ROLE);
+  try {
+    if (userId) {
+      const ctx = await buildUserContext(userId);
+      systemPrompt = contextToSystemPrompt(ctx, ROLE);
+    }
+  } catch { /* usa fallback */ }
+
+  try {
+    const client = new Anthropic({ apiKey });
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 700,
+      system: systemPrompt,
+      messages: [{ role: "user", content: "Crie meu cronograma semanal personalizado." }],
+    });
+    const content = response.content[0];
+    return content.type === "text" ? content.text : "";
+  } catch (err) {
+    return `⚠️ ${err instanceof Error ? err.message : "Erro"}`;
+  }
+}
+
+// Mantém compatibilidade com código antigo
 export async function sendAiMessage(messages: { role: "user" | "assistant"; content: string }[]): Promise<string> {
-  await getAuthenticatedUserId();
-
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-  const response = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 1024,
-    system: `Você é o IAestuda AI, um tutor especializado em concursos públicos brasileiros.
-Você ajuda candidatos a estudar para concursos como INSS, TRT, Receita Federal, Polícia Federal, etc.
-Suas especialidades: Português, Direito Constitucional, Direito Administrativo, Raciocínio Lógico, Informática.
-Seja direto, didático e use exemplos práticos.
-Quando explicar conteúdos, use estrutura clara com tópicos.
-Responda sempre em português brasileiro.`,
-    messages,
-  });
-
-  const content = response.content[0];
-  return content.type === "text" ? content.text : "Não consegui gerar uma resposta.";
+  return sendChatMessage(messages, "tutor");
 }

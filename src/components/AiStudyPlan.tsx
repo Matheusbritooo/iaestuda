@@ -1,41 +1,27 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { Calendar, Loader2, RefreshCw, Download } from "lucide-react";
+import { useState, useTransition } from "react";
+import { generateStudyPlan } from "@/app/actions";
+import { Calendar, RefreshCw, Copy, CheckCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function AiStudyPlan() {
   const [plan, setPlan] = useState("");
-  const [loading, setLoading] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const [copied, setCopied] = useState(false);
 
-  async function generate() {
+  function generate() {
     setPlan("");
-    setLoading(true);
-    const ac = new AbortController();
-    abortRef.current = ac;
-
-    try {
-      const res = await fetch("/api/ai/plan", { signal: ac.signal });
-      if (!res.body) return;
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let acc = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        acc += dec.decode(value, { stream: true });
-        setPlan(acc);
-      }
-    } catch {
-      setPlan("Erro ao gerar cronograma. Verifique sua chave ANTHROPIC_API_KEY.");
-    } finally {
-      setLoading(false);
-    }
+    startTransition(async () => {
+      const result = await generateStudyPlan();
+      setPlan(result);
+    });
   }
 
-  function copyToClipboard() {
+  function copy() {
     navigator.clipboard.writeText(plan);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -47,48 +33,41 @@ export default function AiStudyPlan() {
         </CardTitle>
         <div className="flex items-center gap-2">
           {plan && (
-            <button onClick={copyToClipboard} className="glass border-white/10 text-muted-foreground text-xs px-3 py-1.5 rounded-lg hover:text-foreground flex items-center gap-1.5">
-              <Download className="h-3 w-3" /> Copiar
+            <button onClick={copy} className="glass border-white/10 text-muted-foreground text-xs px-3 py-1.5 rounded-lg hover:text-foreground flex items-center gap-1.5 transition-colors">
+              {copied ? <CheckCheck className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3" />}
+              {copied ? "Copiado!" : "Copiar"}
             </button>
           )}
           <button
             onClick={generate}
-            disabled={loading}
+            disabled={isPending}
             className="gradient-neon text-black text-xs font-bold px-3 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5"
           >
-            {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-            {loading ? "Gerando..." : "Gerar cronograma"}
+            <RefreshCw className={`h-3 w-3 ${isPending ? "animate-spin" : ""}`} />
+            {isPending ? "Gerando..." : "Gerar cronograma"}
           </button>
         </div>
       </CardHeader>
       <CardContent>
-        {!plan && !loading && (
+        {!plan && !isPending ? (
           <div className="text-center py-12 space-y-3">
             <div className="text-4xl">📅</div>
             <p className="text-sm font-medium">Cronograma personalizado com IA</p>
             <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-              A IA analisa seu desempenho por matéria, o prazo da sua prova e distribui
-              o tempo de estudo de forma otimizada para maximizar suas chances de aprovação.
+              A IA analisa seu desempenho e cria um plano semanal otimizado para sua aprovação.
             </p>
           </div>
-        )}
-
-        {(plan || loading) && (
-          <div className="space-y-3">
-            <div className="glass rounded-xl p-4 border-white/7 min-h-[250px]">
-              {plan ? (
-                <pre className="whitespace-pre-wrap font-sans text-sm text-foreground/90 leading-relaxed">{plan}</pre>
-              ) : (
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                  <span>Montando seu cronograma personalizado...</span>
-                </div>
-              )}
-            </div>
-            {plan && (
-              <p className="text-[10px] text-muted-foreground text-center">
-                Cronograma gerado pela IA com base no seu perfil · Válido para esta semana
-              </p>
+        ) : (
+          <div className="glass rounded-xl p-4 border-white/7 min-h-[250px]">
+            {isPending ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                {[0, 150, 300].map((d) => (
+                  <div key={d} className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: `${d}ms` }} />
+                ))}
+                <span className="text-sm ml-1">Montando seu cronograma personalizado...</span>
+              </div>
+            ) : (
+              <pre className="whitespace-pre-wrap font-sans text-sm text-foreground/90 leading-relaxed">{plan}</pre>
             )}
           </div>
         )}
