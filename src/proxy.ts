@@ -4,6 +4,7 @@ const isPublicRoute = createRouteMatcher([
   "/",
   "/entrar(.*)",
   "/cadastro(.*)",
+  "/api/(.*)", // API routes handle their own auth
 ]);
 
 export const proxy = clerkMiddleware(async (auth, req) => {
