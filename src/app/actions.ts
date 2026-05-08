@@ -302,3 +302,93 @@ Priorize matérias com menor taxa de acerto.`;
 export async function sendAiMessage(messages: { role: "user" | "assistant"; content: string }[]): Promise<string> {
   return sendChatMessage(messages, "tutor");
 }
+
+// ─── COMMUNITY ACTIONS ───
+
+export async function createForumPost(title: string, content: string, subject: string): Promise<string | null> {
+  const userId = await getAuthenticatedUserId();
+
+  const post = await prisma.forumPost.create({
+    data: { userId, title: title.trim(), content: content.trim(), subject },
+  });
+
+  // AI auto-response
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (apiKey) {
+    const client = new Anthropic({ apiKey });
+    client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 500,
+      system: `Você é o IAestuda AI — tutor especialista em concursos públicos.
+Responda a dúvida do fórum de forma didática e específica.
+Matéria: ${subject}. Responda em português, máximo 300 palavras.
+Estruture com: explicação, regra e exemplo prático.`,
+      messages: [{ role: "user", content: `Título: ${title}\n\nDúvida: ${content}` }],
+    }).then(async (response) => {
+      const text = response.content[0].type === "text" ? response.content[0].text : "";
+      if (text) {
+        await prisma.forumReply.create({
+          data: {
+            postId: post.id,
+            userId,
+            content: text,
+            isAI: true,
+            upvotes: 5,
+          },
+        });
+      }
+    }).catch(() => {});
+  }
+
+  revalidatePath("/comunidade");
+  return post.id;
+}
+
+export async function createForumReply(
+  postId: string,
+  content: string,
+  postTitle: string,
+  postContent: string,
+  subject: string
+): Promise<void> {
+  const userId = await getAuthenticatedUserId();
+
+  await prisma.forumReply.create({
+    data: { postId, userId, content: content.trim() },
+  });
+
+  // AI complementary response (async)
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (apiKey) {
+    const client = new Anthropic({ apiKey });
+    client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 300,
+      system: `Você é o IAestuda AI. Adicione uma perspectiva complementar à resposta do aluno sobre: ${subject}.
+Seja breve, didático e específico. Máximo 150 palavras.`,
+      messages: [{ role: "user", content: `Pergunta: ${postTitle}\n\nResposta do aluno: ${content}` }],
+    }).then(async (response) => {
+      const text = response.content[0].type === "text" ? response.content[0].text : "";
+      if (text) {
+        await prisma.forumReply.create({
+          data: { postId, userId, content: `**Complemento da IA:**\n\n${text}`, isAI: true, upvotes: 3 },
+        });
+      }
+    }).catch(() => {});
+  }
+
+  revalidatePath(`/comunidade/${postId}`);
+}
+
+export async function voteForumPost(postId: string): Promise<void> {
+  const userId = await getAuthenticatedUserId();
+  const existing = await prisma.forumVote.findFirst({ where: { userId, postId } });
+  if (existing) return;
+
+  await prisma.$transaction([
+    prisma.forumVote.create({ data: { userId, postId } }),
+    prisma.forumPost.update({ where: { id: postId }, data: { upvotes: { increment: 1 } } }),
+  ]);
+
+  revalidatePath(`/comunidade/${postId}`);
+}

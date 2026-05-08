@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import AppLayout from "@/components/AppLayout";
 import ActivityGrid from "@/components/ActivityGrid";
+import MissionPanel from "@/components/MissionPanel";
 import {
   Flame, Trophy, Clock, Brain, TrendingUp, Zap, CheckCircle2,
   Target, Star, ChevronUp, ChevronDown, Lightbulb, ArrowRight,
@@ -362,6 +363,41 @@ export default async function DashboardPage() {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* Missions + Community row */}
+        <div className="grid lg:grid-cols-2 gap-5">
+          <MissionPanel userId={user.id} />
+
+          {/* Community activity */}
+          <Card className="glass-card border-white/5 glow-card">
+            <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-sm font-semibold">Comunidade ativa</CardTitle>
+              <Link href="/comunidade" className="text-xs text-primary hover:underline">Ver fórum →</Link>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="glass rounded-xl p-3 border-white/5">
+                  <p className="text-sm font-medium text-primary">💬 Tire suas dúvidas com a comunidade</p>
+                  <p className="text-xs text-muted-foreground mt-1">Mais de {Math.floor(Math.random() * 50 + 20)} candidatos online agora. A IA responde todas as perguntas automaticamente.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Link href="/comunidade/nova">
+                    <div className="glass rounded-xl p-3 border-white/5 hover:border-primary/20 transition-all cursor-pointer text-center">
+                      <p className="text-xs font-semibold text-primary">Nova pergunta</p>
+                      <p className="text-[10px] text-muted-foreground">IA responde em segundos</p>
+                    </div>
+                  </Link>
+                  <Link href="/comunidade">
+                    <div className="glass rounded-xl p-3 border-white/5 hover:border-secondary/20 transition-all cursor-pointer text-center">
+                      <p className="text-xs font-semibold text-secondary">Ver debates</p>
+                      <p className="text-[10px] text-muted-foreground">Respostas da comunidade</p>
+                    </div>
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </AppLayout>

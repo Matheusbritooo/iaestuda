@@ -14,22 +14,22 @@ import {
 export type NavKey =
   | "dashboard" | "concursos" | "aprender" | "questoes" | "desafio"
   | "revisao" | "ranking" | "perfil" | "progresso" | "metas"
-  | "plano" | "ia" | "materiais" | "simulado";
+  | "plano" | "ia" | "materiais" | "simulado" | "missoes" | "comunidade";
 
 const NAV_GROUPS = [
   {
     label: "Visão Geral",
     items: [
       { href: "/", key: "dashboard", icon: BarChart3, label: "Dashboard" },
-      { href: "/concursos", key: "concursos", icon: Target, label: "Meu Concurso" },
+      { href: "/concursos", key: "concursos", icon: Target, label: "Trilha" },
+      { href: "/missoes", key: "missoes", icon: Star, label: "Missões", badge: "XP" },
     ],
   },
   {
     label: "Estudar",
     items: [
       { href: "/aprender", key: "aprender", icon: BookOpen, label: "Aulas" },
-      { href: "/materiais", key: "materiais", icon: Layers, label: "Materiais" },
-      { href: "/revisao", key: "revisao", icon: BrainCircuit, label: "Revisão Espaçada" },
+      { href: "/revisao", key: "revisao", icon: BrainCircuit, label: "Revisão" },
     ],
   },
   {
@@ -41,11 +41,11 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: "Evolução",
+    label: "Comunidade",
     items: [
-      { href: "/progresso", key: "progresso", icon: TrendingUp, label: "Progresso" },
+      { href: "/comunidade", key: "comunidade", icon: Layers, label: "Fórum" },
       { href: "/ranking", key: "ranking", icon: Trophy, label: "Ranking" },
-      { href: "/metas", key: "metas", icon: Flame, label: "Metas & Streak" },
+      { href: "/progresso", key: "progresso", icon: TrendingUp, label: "Progresso" },
     ],
   },
 ] as const;
